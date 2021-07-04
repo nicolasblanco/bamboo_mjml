@@ -1,9 +1,9 @@
 defmodule Bamboo.PhoenixMjml do
-
   import Bamboo.Email, only: [put_private: 3]
 
   defmacro __using__(view: view) do
     verify_phoenix_dep()
+
     quote do
       import Bamboo.Email
       import Bamboo.PhoenixMjml
@@ -18,7 +18,7 @@ defmodule Bamboo.PhoenixMjml do
 
   defmacro __using__(opts) do
     raise ArgumentError, """
-    expected Bamboo.PhoenixMjml to have a view set, instead got: #{inspect opts}.
+    expected Bamboo.PhoenixMjml to have a view set, instead got: #{inspect(opts)}.
 
     Please set a view e.g. use Bamboo.PhoenixMjml, view: MyApp.MyView
     """
@@ -46,21 +46,27 @@ defmodule Bamboo.PhoenixMjml do
     view_template = Atom.to_string(email.private.view_template)
 
     email
-      |> Map.put(:html_body, render_mjml(email, view_template <> ".html.mjml"))
-      |> Map.put(:text_body, render_text(email, view_template <> ".text"))
+    |> Map.put(:html_body, render_mjml(email, view_template <> ".html.mjml"))
+    |> Map.put(:text_body, render_text(email, view_template <> ".text"))
   end
 
   defp render_mjml_or_text_email(email) do
     template = email.private.view_template
-    cond do
-      String.ends_with?(template, "html.mjml") -> Map.put(email, :html_body, render_mjml(email, template))
-      String.ends_with?(template, ".text") -> Map.put(email, :text_body, render_text(email, template))
-      true -> raise """
-        Template name must end in either ".html.mjml" or ".text". Template name was #{inspect template}
 
-        If you would like to render both and html and text template,
-        use an atom without an extension instead.
-      """
+    cond do
+      String.ends_with?(template, "html.mjml") ->
+        Map.put(email, :html_body, render_mjml(email, template))
+
+      String.ends_with?(template, ".text") ->
+        Map.put(email, :text_body, render_text(email, template))
+
+      true ->
+        raise """
+          Template name must end in either ".html.mjml" or ".text". Template name was #{inspect(template)}
+
+          If you would like to render both and html and text template,
+          use an atom without an extension instead.
+        """
     end
   end
 
@@ -71,34 +77,26 @@ defmodule Bamboo.PhoenixMjml do
   end
 
   defp compile_mjml(mjml) when is_binary(mjml) do
-    uuid = UUID.uuid1
-    File.mkdir("tmp")
-    path = "/tmp/#{uuid}"
-    File.write!(path, mjml)
-    case System.cmd("mjml", ["-l", "skip", "-s", path]) do
-      {html, 0} ->
-        :ok = File.rm!(path)
-        html
-      _         ->
-        File.rm!(path)
-        raise """
-          Mjml exited with non zero status, mail has not been compiled
-          """
+    case Mjml.to_html(mjml) do
+      {:ok, html} -> html
+      {:error, message} -> raise "Error when compiling Mjml: #{message}"
     end
   end
 
   defp verify_phoenix_dep do
     unless Code.ensure_loaded?(Phoenix) do
       raise "You tried to use Bamboo.Phoenix, but Phoenix module is not loaded. " <>
-      "Please add phoenix to your dependencies."
+              "Please add phoenix to your dependencies."
     end
   end
 
   @doc false
   def put_default_layouts(%{private: private} = email) do
-    private = private
+    private =
+      private
       |> Map.put_new(:html_layout, false)
       |> Map.put_new(:text_layout, false)
+
     %{email | private: private}
   end
 
@@ -133,9 +131,9 @@ defmodule Bamboo.PhoenixMjml do
     assigns = Map.put(email.assigns, :layout, email.private.text_layout)
 
     Phoenix.View.render_to_string(
-    email.private.view_module,
-    template,
-    assigns
+      email.private.view_module,
+      template,
+      assigns
     )
   end
 end
